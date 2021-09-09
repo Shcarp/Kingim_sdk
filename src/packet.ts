@@ -1,6 +1,4 @@
 import { Header, Flag, Status } from "./proto/common";
-import log from "loglevel-es";
-import { LoginReq } from "./proto/protocol";
 
 // 获取0-65535之间的整数
 export class Seq {
@@ -13,21 +11,24 @@ export class Seq {
 }
 
 export enum Command {
-    // 登陆
-    SingIn =  "login.signin",
-    SingOut = "login.singout",
-    // 聊天
-    ChatUserTalk = "chat.user.talk",
-    ChatGroupTalk = "chat.group.talk",
-    ChatTalkAck = "chat.talk.ack",
-    // 离线
-    OfflineIndex = "chat.offline.talk",
-    OfflineContent = "chat.offline.content",
-    // 群管理
-    GroupCreate = "chat.group.create",
-    GroupJoin = "chat.group.join",
-    GroupQuit = "chat.group.quit",
-    GroupDetail = "chat.group.detail",
+     // login
+     SignIn = "login.signin",
+     SignOut = "login.signout",
+ 
+     // chat
+     ChatUserTalk = "chat.user.talk",
+     ChatGroupTalk = "chat.group.talk",
+     ChatTalkAck = "chat.talk.ack",
+ 
+     // 离线
+     OfflineIndex = "chat.offline.index",
+     OfflineContent = "chat.offline.content",
+ 
+     // 群管理
+     GroupCreate = "chat.group.create",
+     GroupJoin = "chat.group.join",
+     GroupQuit = "chat.group.quit",
+     GroupDetail = "chat.group.detail",
 }
 
 // 魔数
@@ -60,7 +61,61 @@ export class LogicPkt {
     constructor() {
         this.payload = new Uint8Array();
     }
-    static build()
+    static build(command:string, dest: string, payload: Uint8Array=new Uint8Array()): LogicPkt {
+         // build LogicPkt
+         let message = new LogicPkt()
+         message.command = command
+         message.sequence = Seq.Next()
+         message.dest = dest
+         if (payload.length > 0) {
+             message.payload = payload
+         }
+         return message
+    }
+    // 类型为 魔数+头长度+头+内容长度+内容
+    static from (buf: Buffer): LogicPkt {
+        let offset = 0
+        let magic = buf.readInt32BE(offset)
+        let hlen = 0
+        // 判断前面四个字节是否为Magic
+        if (magic == MagicLogicPktInt) {
+            offset += 4
+        }
+        hlen = buf.readInt32BE(offset)
+        offset += 4
+        // 反序列化Header
+        let header = Header.decode(buf.subarray(offset, offset + hlen))
+        offset += hlen
+        let message = new LogicPkt()
+        // 把header中的属性copy到message
+        Object.assign(message, header)
+        // 读取payload
+        let plen = buf.readInt32BE(offset)
+        offset += 4
+        message.payload = buf.subarray(offset, offset + plen)
+        return message     
+    }
+    bytes(): Buffer {
+        let headerArray = Header.encode(Header.fromJSON(this)).finish()
+        let hlen = headerArray.length
+        let plen = this.payload.length
+        let buf = Buffer.alloc(4+4+hlen+4+plen)
+        let offset = 0
+        Buffer.from(MagicLogicPkt).copy(buf, offset, 0)
+        offset += 4
+        offset =  buf.writeInt32BE(hlen, offset)
+        Buffer.from(headerArray).copy(buf, offset, 0)    
+        offset += hlen
+        offset = buf.writeInt32BE(plen, offset)
+        Buffer.from(this.payload).copy(buf, offset, 0)
+        return buf
+    }
+}
+export let print = (err: Uint8Array) => {
+    if (err == null) {
+        return
+    }
+    console.info(`[${err.join(",")}]`)
 }
 
 
