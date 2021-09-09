@@ -55,7 +55,7 @@ export class LogicPkt {
     channelId ?: string
     sequence: number = 0
     flag ?: number
-    status ?: number = Status.Success
+    status : number = Status.Success
     dest ?: string
     payload: Uint8Array
     constructor() {
